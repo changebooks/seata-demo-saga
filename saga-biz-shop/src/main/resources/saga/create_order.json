@@ -1,0 +1,145 @@
+{
+  "Name": "CreateOrder",
+  "Comment": "createOrder -> decreaseBalance -> outStock -> deleteOrder -> increaseBalance -> inStock",
+  "StartState": "CreateOrderServiceTask",
+  "Version": "1.0.0",
+  "States": {
+    "CreateOrderServiceTask": {
+      "Type": "ServiceTask",
+      "ServiceName": "ShopRepositoryImpl",
+      "ServiceMethod": "createOrder",
+      "CompensateState": "DeleteOrderServiceTask",
+      "Next": "AccountChoice",
+      "Input": [
+        "$.[orderId]",
+        "$.[userId]",
+        "$.[productId]",
+        "$.[productNum]",
+        "$.[payNum]"
+      ],
+      "Output": {
+        "createOrderResult": "$.#root"
+      },
+      "Status": {
+        "#root == true": "SU",
+        "#root == false": "FA",
+        "$Exception{java.lang.Throwable}": "UN"
+      }
+    },
+    "DeleteOrderServiceTask": {
+      "Type": "ServiceTask",
+      "ServiceName": "ShopRepositoryImpl",
+      "ServiceMethod": "deleteOrder",
+      "Input": [
+        "$.[orderId]"
+      ]
+    },
+    "AccountChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Expression": "[createOrderResult] == true",
+          "Next": "DecreaseBalanceServiceTask"
+        }
+      ],
+      "Default": "Fail"
+    },
+    "DecreaseBalanceServiceTask": {
+      "Type": "ServiceTask",
+      "ServiceName": "ShopRepositoryImpl",
+      "ServiceMethod": "decreaseBalance",
+      "CompensateState": "IncreaseBalanceServiceTask",
+      "Next": "InventoryChoice",
+      "Input": [
+        "$.[userId]",
+        "$.[num]",
+        "$.[orderId]"
+      ],
+      "Output": {
+        "decreaseBalanceResult": "$.#root"
+      },
+      "Status": {
+        "#root == true": "SU",
+        "#root == false": "FA",
+        "$Exception{java.lang.Throwable}": "UN"
+      },
+      "Catch": [
+        {
+          "Exceptions": [
+            "java.lang.Throwable"
+          ],
+          "Next": "CompensationTrigger"
+        }
+      ]
+    },
+    "IncreaseBalanceServiceTask": {
+      "Type": "ServiceTask",
+      "ServiceName": "ShopRepositoryImpl",
+      "ServiceMethod": "increaseBalance",
+      "Input": [
+        "$.[userId]",
+        "$.[num]",
+        "$.[orderId]"
+      ]
+    },
+    "InventoryChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Expression": "[decreaseBalanceResult] == true",
+          "Next": "OutStockServiceTask"
+        }
+      ],
+      "Default": "Fail"
+    },
+    "OutStockServiceTask": {
+      "Type": "ServiceTask",
+      "ServiceName": "ShopRepositoryImpl",
+      "ServiceMethod": "outStock",
+      "CompensateState": "InStockServiceTask",
+      "Input": [
+        "$.[productId]",
+        "$.[num]",
+        "$.[orderId]"
+      ],
+      "Output": {
+        "outStockResult": "$.#root"
+      },
+      "Status": {
+        "#root == true": "SU",
+        "#root == false": "FA",
+        "$Exception{java.lang.Throwable}": "UN"
+      },
+      "Catch": [
+        {
+          "Exceptions": [
+            "java.lang.Throwable"
+          ],
+          "Next": "CompensationTrigger"
+        }
+      ]
+    },
+    "InStockServiceTask": {
+      "Type": "ServiceTask",
+      "ServiceName": "ShopRepositoryImpl",
+      "ServiceMethod": "inStock",
+      "Input": [
+        "$.[productId]",
+        "$.[num]",
+        "$.[orderId]"
+      ]
+    },
+    "CompensationTrigger": {
+      "Type": "CompensationTrigger",
+      "Next": "Fail"
+    },
+    "Succeed": {
+      "Type": "Succeed"
+    },
+    "Fail": {
+      "Type": "Fail",
+      "ErrorCode": "CREATE_ORDER_FAILED",
+      "Message": "create order failed"
+    }
+  }
+}
